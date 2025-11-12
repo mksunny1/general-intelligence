@@ -1,10 +1,12 @@
 LICENSE
 README.md
+pyproject.toml
 setup.py
 examples/__init__.py
 examples/basic_usage.py
 general_intelligence.egg-info/PKG-INFO
 general_intelligence.egg-info/SOURCES.txt
 general_intelligence.egg-info/dependency_links.txt
-general_intelligence.egg-info/requires.txt
 general_intelligence.egg-info/top_level.txt
+gi/__init__.py
+gi/core.py

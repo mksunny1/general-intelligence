@@ -1,17 +1,23 @@
-Metadata-Version: 2.1
-Name: general-intelligence
+Metadata-Version: 2.4
+Name: general_intelligence
 Version: 0.1.0
 Summary: Self-organizing knowledge systems for structural pattern learning
 Home-page: https://github.com/yourusername/general-intelligence
-Author: Your Name
-License: UNKNOWN
-Platform: UNKNOWN
+Author: Oluwaseyi Shoboyejo
+Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/mksunny1/general-intelligence
+Project-URL: Issues, https://github.com/mksunny1/general-intelligence/issues
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Science/Research
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
 
 # General Intelligence
 
@@ -123,5 +129,3 @@ This models how knowledge actually works: not as passive data, but as active pat
 **Status**: Early prototype. Core functionality works. Community contributions welcome.
 
 ---
-
-

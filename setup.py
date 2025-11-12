@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=["numpy"],
-    author="Your Name",
+    author="Oluwaseyi Shoboyejo",
     description="Self-organizing knowledge systems for structural pattern learning",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
