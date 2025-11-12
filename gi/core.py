@@ -51,6 +51,8 @@ class GeneralIntelligence:
             existing.on_knowledge(new_knowledge=new_knowledge, gi=self)
         self.knowledge.append(new_knowledge)
 
+        return self
+
     def identify(self, data, threshold=0):
         """
         Find knowledge matching the given data within a similarity threshold.

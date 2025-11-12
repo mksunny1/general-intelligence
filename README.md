@@ -38,7 +38,6 @@ matches = gi.identify(Knowledge([1, 2]), threshold=0)
 
 ```python
 class AlertKnowledge(Knowledge):
-    @classmethod
     def is_response_for(cls, trigger, gi):
         return trigger.get('type') == 'alert'
     
