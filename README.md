@@ -1,7 +1,7 @@
 
-# GeneralIntelligence
+# general-intelligence
 
-**GeneralIntelligence** is a minimal but powerful framework for **self-organizing, interactive knowledge systems**.
+**general-intelligence** is a minimal but powerful framework for **self-organizing, interactive knowledge systems**.
 
 Instead of relying on fixed algorithms or massive datasets, it treats **knowledge itself as the active core of intelligence**.
 Each piece of knowledge can learn, relate, react, and even operate autonomously. The system becomes a living structure of interacting knowledge — not just a database, not just a model.
