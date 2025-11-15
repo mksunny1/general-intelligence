@@ -1,9 +1,7 @@
 Metadata-Version: 2.4
 Name: general_intelligence
-Version: 0.3.2
+Version: 0.3.3
 Summary: Self-organizing knowledge systems for structural pattern learning
-Home-page: https://github.com/yourusername/general-intelligence
-Author: Oluwaseyi Shoboyejo
 Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
 License-Expression: MIT
 Project-URL: Homepage, https://github.com/mksunny1/general-intelligence
@@ -15,8 +13,6 @@ Classifier: Operating System :: OS Independent
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Dynamic: author
-Dynamic: home-page
 Dynamic: license-file
 
 

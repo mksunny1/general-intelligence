@@ -151,9 +151,9 @@ class Knowledge:
 
     Example:
         >>> class SequenceKnowledge(Knowledge):
-        ...     def difference(self, data):
+        ...     def difference(self, other):
         ...         # Custom comparison for sequences
-        ...         return compute_sequence_distance(self.values, data.values)
+        ...         return compute_sequence_distance(self.values, other.values)
         >>>
         >>> gi = GeneralIntelligence()
         >>> gi.learn(SequenceKnowledge([1, 2, 3, 4]))
@@ -170,7 +170,7 @@ class Knowledge:
     def __repr__(self):
         return repr(self.values)
 
-    def difference(self, data):
+    def difference(self, other):
         """
         Compute structural difference between this knowledge and given data.
 
@@ -178,7 +178,7 @@ class Knowledge:
         Override this for custom comparison logic.
 
         Args:
-            data: Data to compare against (Knowledge instance, list, or value)
+            other: Data to compare against (Knowledge instance, list, or value)
 
         Returns:
             float: Distance measure (0 = identical, inf = incompatible, higher = more different)
@@ -188,12 +188,19 @@ class Knowledge:
             >>> k2 = Knowledge([2, 3, 4])
             >>> print(k1.difference(k2))  # 3
         """
-        data_values = data if isinstance(data, (list, tuple)) else data.values if isinstance(data, Knowledge) else [data]
+        data_values = other if isinstance(other, (list, tuple)) else other.values if isinstance(other, Knowledge) else [other]
         if len(data_values) != len(self.values):
             return np.inf
         return sum(difference(v1, v2) for v1, v2 in zip(self.values, data_values))
 
-    def identify(self, data, threshold=0):
+    def within_threshold(self, diff, threshold):
+        """
+        Determines whether a given diff is acceptable.
+        Can be overridden for richer distance semantics.
+        """
+        return diff <= threshold
+
+    def identify(self, other, threshold=0):
         """
         Find this knowledge or nested knowledge matching the data.
 
@@ -201,7 +208,7 @@ class Knowledge:
         nested Knowledge instances. Enables hierarchical pattern matching.
 
         Args:
-            data: Data to identify
+            other: Data to identify
             threshold: Maximum difference for a match
 
         Returns:
@@ -212,12 +219,12 @@ class Knowledge:
             >>> match, dist = nested.identify(Knowledge([1, 2]))
             >>> print(match)  # [1, 2]
         """
-        diff = self.difference(data)
-        if diff <= threshold:
+        diff = self.difference(other)
+        if self.within_threshold(diff, threshold):
             return self, diff
         for value in self.values:
             if isinstance(value, Knowledge):
-                potential_result, dist = value.identify(data, threshold)
+                potential_result, dist = value.identify(other, threshold)
                 if potential_result is not None:
                     return potential_result, dist
         return None, 0

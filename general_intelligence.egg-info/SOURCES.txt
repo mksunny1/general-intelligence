@@ -1,7 +1,6 @@
 LICENSE
 README.md
 pyproject.toml
-setup.py
 examples/__init__.py
 examples/basic_usage.py
 general_intelligence.egg-info/PKG-INFO
