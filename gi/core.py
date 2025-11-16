@@ -1,342 +1,182 @@
-import numpy as np
+from typing import Union
 
 
 class GeneralIntelligence:
     """
-    A self-organizing knowledge system that learns through structural pattern matching.
+    A self-organizing knowledge system that grows by accumulating
+    independently authored Knowledge instances.
 
-    Unlike traditional machine learning which requires fixed feature spaces and large datasets,
-    GeneralIntelligence works with arbitrary nested data structures and learns from examples
-    by memorizing and comparing structural patterns.
+    GeneralIntelligence imposes **no hierarchy and no control center**.
+    Each knowledge instance is autonomous and responsible for:
 
-    Knowledge instances are active participants that:
-    - React when added to the system (on_learned)
-    - Respond to new knowledge being learned (on_knowledge)
-    - Compose responses to events (via on() triggers)
-    - Operate autonomously if marked as active
+        - reacting to new knowledge (on_knowledge)
+        - reacting to stimuli (on)
+        - optionally running independently (start/stop)
+        - shaping shared output (compose)
+
+    The system is fully distributed: all knowledge interacts through
+    shared context dictionaries and through explicit collaboration rules
+    each subclass defines for itself.
 
     Example:
         >>> gi = GeneralIntelligence()
-        >>> gi.learn(Knowledge([1, 2, 3]))
-        >>> matches = list(gi.identify(Knowledge([2, 3, 4]), threshold=5))
-        >>> print(matches[0])  # ([1, 2, 3], 3)
+        >>> class Counter(Knowledge):
+        ...     def __init__(self):
+        ...         self.count = 0
+        ...     def on(self, ctx, gi):
+        ...         inc = ctx["data"].get("increment")
+        ...         if inc:
+        ...             self.count += inc
+        ...             return self   # yield directly
+        >>> c = Counter()
+        >>> gi.learn(c)
+        >>> for _ in gi.on({"increment": 2}):
+        ...     pass
+        >>> c.count
+        2
 
     Attributes:
-        knowledge (list): Collection of learned Knowledge instances
-
+        knowledge (list): The ordered list of Knowledge instances.
+                          Earlier entries have higher priority.
     """
+
     def __init__(self):
         self.knowledge = []
 
-    def learn(self, new_knowledge):
+    def learn(self, knowledge):
         """
-        Learn a new knowledge instance and integrate it into the system.
+        Add a new knowledge instance to the system.
 
-        The knowledge is informed it's been learned (on_learned), then all existing
-        knowledge is notified about the new arrival (on_knowledge). This allows
-        knowledge to form relationships and self-organize.
+        Steps:
+            1. Append to the internal list.
+            2. Call on_knowledge(new_knowledge, self) on *all* knowledge,
+               including the new instance itself.
+            3. Start autonomous behavior (start()).
 
         Args:
-            new_knowledge: A Knowledge instance to learn
-
-        Example:
-            >>> gi = GeneralIntelligence()
-            >>> gi.learn(Knowledge([1, 2, 3]))
-            >>> gi.learn(Knowledge([Knowledge([4, 5]), Knowledge([6, 7])]))
-        """
-        new_knowledge.on_learned(gi=self)
-
-        # Inform all existing knowledge about new arrival
-        for existing in self.knowledge:
-            existing.on_knowledge(new_knowledge=new_knowledge, gi=self)
-        self.knowledge.append(new_knowledge)
-
-        return self
-
-    def identify(self, data, threshold=0):
-        """
-        Find knowledge matching the given data within a similarity threshold.
-
-        Searches through learned knowledge hierarchically - can match exact data
-        or patterns nested within learned structures. Yields all matches within
-        the threshold as (knowledge, distance) tuples.
-
-        Args:
-            data: Data to identify (typically a Knowledge instance or raw value)
-            threshold: Maximum difference distance for a match (default: 0 for exact)
-
-        Yields:
-            tuple: (matched_knowledge, distance) for each match found
-
-        Example:
-            >>> gi = GeneralIntelligence()
-            >>> gi.learn(Knowledge([1, 2, 3]))
-            >>> for match, dist in gi.identify(Knowledge([1, 2, 3]), threshold=0):
-            ...     print(f"Match: {match}, Distance: {dist}")
-        """
-        for s_data in self.knowledge:
-            if isinstance(s_data, Knowledge):
-                potential_data, dist = s_data.identify(data, threshold)
-                if potential_data is not None:
-                    yield potential_data, dist
-            elif abs(s_data - data) <= threshold:
-                yield s_data, abs(s_data - data)
-
-    def compose(self, context, knowledge_class):
-        """
-        Compose new knowledge by letting all learned knowledge shape a context.
-
-        Each knowledge instance can contribute to the context through its compose()
-        method, allowing collective intelligence to build complex responses.
-
-        Args:
-            context: Dictionary that knowledge instances can modify
-            knowledge_class: Class to instantiate with the composed context
+            knowledge: A Knowledge instance.
 
         Returns:
-            Instance of knowledge_class created from the shaped context
-
-        Example:
-            >>> context = {'values': []}
-            >>> result = gi.compose(context, Knowledge)
+            self
         """
-        for knowledge in self.knowledge:
-            knowledge.compose(context, knowledge_class)
-        return knowledge_class(context)
+        self.knowledge.append(knowledge)
+        for existing in self.knowledge:
+            existing.on_add(knowledge, self)
+        return self
 
-    def on(self, trigger):
+    def move(self, knowledge, new_index):
         """
-        Trigger event-driven responses from knowledge that declares interest.
+        Reorder a knowledge instance.
 
-        Knowledge instances can implement is_response_for(trigger, gi) to declare
-        what events they respond to. Matching knowledge instances compose
-        responses collectively.
+        Knowledge classes may call this to adjust their own priority.
+        """
+        self.knowledge.remove(knowledge)
+        self.knowledge.insert(new_index, knowledge)
+
+    def unlearn(self, knowledge):
+        """
+        Remove a knowledge instance and stop its autonomous behavior.
+        """
+        for existing in self.knowledge:
+            existing.on_remove(knowledge, self)
+        self.knowledge.remove(knowledge)
+
+    def compose(self, context, composer):
+        """
+        Run the collaborative composition pipeline.
+
+        Each knowledge instance may modify the context before the final
+        composer is called.
 
         Args:
-            trigger: Event data (typically a dict with event type and parameters)
+            context: Shared dictionary.
+            composer: Callable taking (context) -> output.
+
+        Returns:
+            Any output produced by composer(context).
+        """
+        for k in self.knowledge:
+            k.compose(context, composer, self)
+        return composer(context)
+
+    def on(self, context):
+        """
+        Stimulate the system.
+
+        Knowledge.on() may return:
+            - None        → ignore stimulus
+            - non-callable → yield directly
+            - callable     → treat as composer and return composed result
+
+        Args:
+            context: Arbitrary input.
 
         Yields:
-            Composed responses from knowledge instances that matched the trigger
-
-        Example:
-            >>> class AlertKnowledge(Knowledge):
-            ...     def is_response_for(cls, trigger, gi):
-            ...         return trigger.get('type') == 'alert'
-            >>>
-            >>> gi.learn(AlertKnowledge([1]))
-            >>> for response in gi.on({'type': 'alert', 'level': 'high'}):
-            ...     print(response)
+            Responses from knowledge modules.
         """
-        context = dict(trigger=trigger, responses=[])
+
         for knowledge in self.knowledge:
-            if knowledge.is_response_for(trigger, self):
-                resp = self.compose(context, type(knowledge))
-                context['responses'].append(resp)
-                yield resp
+            result = knowledge.on(context, self)
+
+            if result is not None:
+                response = (
+                    self.compose(context, result)
+                    if callable(result)
+                    else result
+                )
+                yield response
 
 
 class Knowledge:
     """
-    Base class for all knowledge instances in the system.
+    Base class for all knowledge modules.
 
-    Knowledge represents learned patterns that can identify similar patterns,
-    react to new information, and compose responses. Unlike passive data,
-    Knowledge instances actively participate in learning and reasoning.
+    A Knowledge instance is a self-contained behavioral unit. There is
+    no required structure—each subclass decides its own internal data,
+    parameters, protocols, and interactions.
 
-    Subclass this to create specialized knowledge types with custom:
-    - Difference computation (difference method)
-    - Event responses (is_response_for classmethod)
-    - Autonomous behavior (is_active, start methods)
-    - Relationship formation (on_knowledge method)
+    Override these methods to implement behavior:
+
+        on_knowledge(new_knowledge, gi)
+            Called every time ANY knowledge is added, including itself.
+
+        on(context, gi)
+            Handle stimuli.
+            Return:
+                None          → ignore
+                non-callable   → yield directly
+                callable       → treated as composer
+
+        compose(context, composer, gi)
+            Optional hook to shape the shared context during composition.
+
+        start(gi)
+            Begin autonomous behavior (threads, loops, timers, etc.)
+
+        stop(gi)
+            End autonomous behavior when removed.
 
     Example:
-        >>> class SequenceKnowledge(Knowledge):
-        ...     def difference(self, other):
-        ...         # Custom comparison for sequences
-        ...         return compute_sequence_distance(self.values, other.values)
-        >>>
+        >>> class Echo(Knowledge):
+        ...     def on(self, ctx, gi):
+        ...         msg = ctx["data"].get("echo")
+        ...         if msg:
+        ...             self.last = msg
+        ...             return msg
         >>> gi = GeneralIntelligence()
-        >>> gi.learn(SequenceKnowledge([1, 2, 3, 4]))
-
-    Attributes:
-        values: The data this knowledge represents (numbers and/or nested Knowledge)
+        >>> ek = gi.learn(Echo())
+        >>> list(gi.on({"echo": "hello"}))
+        ['hello']
     """
-    def __init__(self, values=None):
-        self.values = values
 
-    def __str__(self):
-        return str(self.values)
-
-    def __repr__(self):
-        return repr(self.values)
-
-    def difference(self, other):
-        """
-        Compute structural difference between this knowledge and given data.
-
-        Base implementation does element-wise comparison for same-length sequences.
-        Override this for custom comparison logic.
-
-        Args:
-            other: Data to compare against (Knowledge instance, list, or value)
-
-        Returns:
-            float: Distance measure (0 = identical, inf = incompatible, higher = more different)
-
-        Example:
-            >>> k1 = Knowledge([1, 2, 3])
-            >>> k2 = Knowledge([2, 3, 4])
-            >>> print(k1.difference(k2))  # 3
-        """
-        data_values = other if isinstance(other, (list, tuple)) else other.values if isinstance(other, Knowledge) else [other]
-        if len(data_values) != len(self.values):
-            return np.inf
-        return sum(difference(v1, v2) for v1, v2 in zip(self.values, data_values))
-
-    def within_threshold(self, diff, threshold):
-        """
-        Determines whether a given diff is acceptable.
-        Can be overridden for richer distance semantics.
-        """
-        return diff <= threshold
-
-    def identify(self, other, threshold=0):
-        """
-        Find this knowledge or nested knowledge matching the data.
-
-        First checks if this knowledge matches. If not, recursively searches
-        nested Knowledge instances. Enables hierarchical pattern matching.
-
-        Args:
-            other: Data to identify
-            threshold: Maximum difference for a match
-
-        Returns:
-            tuple: (matched_knowledge, distance) or (None, 0) if no match
-
-        Example:
-            >>> nested = Knowledge([Knowledge([1, 2]), Knowledge([3, 4])])
-            >>> match, dist = nested.identify(Knowledge([1, 2]))
-            >>> print(match)  # [1, 2]
-        """
-        diff = self.difference(other)
-        if self.within_threshold(diff, threshold):
-            return self, diff
-        for value in self.values:
-            if isinstance(value, Knowledge):
-                potential_result, dist = value.identify(other, threshold)
-                if potential_result is not None:
-                    return potential_result, dist
-        return None, 0
-
-    def compose(self, context, knowledge_class):
-        """
-        Contribute to composing new knowledge from a context.
-
-        Override this to have your knowledge shape collective responses.
-        Modify the context dict to influence the final composed result.
-
-        Args:
-            context: Shared context dict that all knowledge can modify
-            knowledge_class: The class being composed
-
-        Example:
-            >>> def compose(self, context, knowledge_class):
-            ...     context['confidence'] = self.compute_confidence()
-        """
+    def on_add(self, knowledge, gi):
         pass
 
-    def on_learned(self, gi):
-        """
-        Called when this knowledge is learned by a GeneralIntelligence system.
-
-        Override to react to being added to a knowledge base. If is_active()
-        returns True, start() will be called to begin autonomous operation.
-
-        Args:
-            gi: The GeneralIntelligence instance that learned this knowledge
-
-        Example:
-            >>> def on_learned(self, gi):
-            ...     print(f"Learned by system with {len(gi.knowledge)} total knowledge")
-            ...     self.register_with_related_knowledge(gi)
-        """
-        if self.is_active():
-            self.start(gi)
-
-    def on_knowledge(self, new_knowledge, gi):
-        """
-        Called when new knowledge is learned by a system this knowledge belongs to.
-
-        Override to form relationships, update internal state, or react to
-        related knowledge being learned.
-
-        Args:
-            new_knowledge: The newly learned Knowledge instance
-            gi: The GeneralIntelligence system where this occurred
-
-        Example:
-            >>> def on_knowledge(self, new_knowledge, gi):
-            ...     if isinstance(new_knowledge, CompatibleKnowledge):
-            ...         self.related_knowledge.append(new_knowledge)
-        """
+    def on_remove(self, knowledge, gi):
         pass
 
-    def is_response_for(self, trigger, gi):
-        """
-        Declare whether this knowledge type responds to a given trigger.
-
-        Override to make your knowledge react to specific events via gi.on(trigger).
-
-        Args:
-            trigger: Event data (typically a dict)
-            gi: The GeneralIntelligence instance
-
-        Returns:
-            bool: True if this knowledge should compose a response
-
-        Example:
-            >>> def is_response_for(cls, trigger, gi):
-            ...     return trigger.get('type') == 'pattern_query'
-        """
-        return False
-
-    def is_active(self):
-        """
-        Whether this knowledge should operate autonomously.
-
-        Returns:
-            bool: True to have start() called when learned
-
-        Example:
-            >>> def is_active(self):
-            ...     return True  # Begin monitoring when learned
-        """
-        return False
-
-    def start(self, gi):
-        """
-        Begin autonomous operation (called if is_active() returns True).
-
-        Override to implement self-directed behavior like monitoring,
-        periodic updates, or proactive reasoning.
-
-        Args:
-            gi: The GeneralIntelligence instance this knowledge belongs to
-
-        Example:
-            >>> def start(self, gi):
-            ...     self.monitor_thread = threading.Thread(target=self.monitor, args=(gi,))
-            ...     self.monitor_thread.start()
-        """
+    def on(self, context, gi):
         pass
 
-
-def difference(value1, value2):
-    if isinstance(value1, Knowledge):
-        return value1.difference(value2)
-    elif isinstance(value2, Knowledge):
-        return value2.difference(value1)
-    else:
-        return abs(value1 - value2)
-
+    def compose(self, context, composer, gi):
+        pass

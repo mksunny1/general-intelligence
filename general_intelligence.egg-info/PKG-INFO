@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: general_intelligence
-Version: 0.3.3
+Version: 0.4.0
 Summary: Self-organizing knowledge systems for structural pattern learning
 Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
 License-Expression: MIT
@@ -15,134 +15,29 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Dynamic: license-file
 
-
 # general-intelligence
 
-**general-intelligence** is a minimal but powerful framework for **self-organizing, interactive knowledge systems**.
+**general-intelligence** is a framework for **self-organizing, composable knowledge systems**.
 
-Instead of relying on fixed algorithms or massive datasets, it treats **knowledge itself as the active core of intelligence**.
-Each piece of knowledge can learn, relate, react, and even operate autonomously. The system becomes a living structure of interacting knowledge — not just a database, not just a model.
+Rather than centering intelligence on algorithms or massive datasets, intelligence emerges from the **structure, interaction, and behavior of knowledge** itself. Each knowledge instance can learn, reason, react to new information, contribute to shared outputs, or even operate autonomously.
 
----
-
-## Core Idea
-
-Traditional AI is algorithm-driven.
-This framework is **knowledge-driven**.
-
-* Intelligence here comes from the *structure and interaction of knowledge*.
-* Each `Knowledge` instance can recognize patterns, react to new information, and shape context.
-* The `GeneralIntelligence` system is just a container — a universe where knowledge organizes itself through relationships.
-
-You can think of it as moving “intelligence” from code into data itself.
-Smart data, not smart algorithms.
+This is **not a toy**—it supports ML-style reasoning, prompt-response systems, and autonomous agents, all within the same model.
 
 ---
 
-## Example
+## Core Philosophy
 
-```python
-from gi import GeneralIntelligence, Knowledge
-gi = GeneralIntelligence()
+* Intelligence arises from **knowledge, not code**.
+* Knowledge is **active, composable, and distributed**.
+* The system is **flat**—no central scheduler or hard-coded control.
+* Knowledge interacts through **context dictionaries** and **collaborative composition**.
 
-# Learn some knowledge
-gi.learn(Knowledge([1, 2, 3]))
-gi.learn(Knowledge([Knowledge([4, 5]), Knowledge([6, 7])]))
+Each `Knowledge` instance decides:
 
-# Identify patterns
-matches = list(gi.identify(Knowledge([2, 3, 4]), threshold=5))
-print(matches[0])  # ([1, 2, 3], 3)
-```
-
-Each `Knowledge` object can contain other `Knowledge` objects, forming nested, compositional structures.
-Identification is recursive and structural — the system can find partial or nested matches automatically.
-
----
-
-## Event-driven Intelligence
-
-Knowledge can declare how it responds to triggers:
-
-```python
-from gi import GeneralIntelligence, Knowledge
-gi = GeneralIntelligence()
-class AlertKnowledge(Knowledge):
-    def is_response_for(self, trigger, gi):
-        return trigger.get('type') == 'alert'
-
-gi.learn(AlertKnowledge(['⚠️']))
-for response in gi.on({'type': 'alert', 'level': 'high'}):
-    print(response)
-```
-
-This creates **event-driven reasoning** — knowledge responding directly to the world or other knowledge.
-
----
-
-## Extending Knowledge
-
-Subclass `Knowledge` to define specialized reasoning or modalities.
-
-```python
-from gi import Knowledge
-class SequenceKnowledge(Knowledge):
-    def difference(self, data):
-        # Custom sequence distance
-        return sum(abs(a - b) for a, b in zip(self.values, data.values))
-```
-
-```python
-from gi import Knowledge
-class PatternKnowledge(Knowledge):
-    def __init__(self, values):
-        super().__init__(values)
-        self.related_patterns = []
-    
-    def on_knowledge(self, new_knowledge, gi):
-        # React when new knowledge is learned
-        if isinstance(new_knowledge, PatternKnowledge):
-            if self.similar_pattern(new_knowledge):
-                self.related_patterns.append(new_knowledge)
-                new_knowledge.related_patterns.append(self)
-    def similar_pattern(self, new_knowledge):
-        return new_knowledge.values == self.values
-    
-    def compose(self, context, knowledge_class):
-        # Influence composition of new knowledge
-        context.update(self.contribute_to(context))
-
-    def contribute_to(self, context):
-        context['knowledge_to_work_with'].append(self)
-```
-
-Knowledge can also:
-
-* react when learned (`on_learned`)
-* react to new knowledge (`on_knowledge`)
-* contribute to collective reasoning (`compose`)
-* operate autonomously (`is_active` + `start`)
-
----
-
-## Architectural Principles
-
-| Concept                   | Description                                             |
-| ------------------------- | ------------------------------------------------------- |
-| **Knowledge as agents**   | Each instance can act, relate, and respond              |
-| **Structural similarity** | Learning is done through pattern comparison, not labels |
-| **Emergent reasoning**    | Intelligence arises from interactions, not code logic   |
-| **Composable context**    | Knowledge contributes to shared reasoning contexts      |
-| **Autonomous operation**  | Active knowledge can think or evolve independently      |
-
----
-
-## Use Cases
-
-* Building **hierarchical or multimodal reasoning systems**
-* Creating **interactive world models**
-* Running **autonomous knowledge agents**
-* Integrating with **traditional ML/DL** as specialized knowledge subclasses
-* Experimenting with **emergent cognition, continual learning, or reflective AI**
+* When to respond to a stimulus (`on`)
+* When to react to new knowledge (`on_add`)
+* When to react to knowledge removal (`on_remove`)
+* How to contribute to shared reasoning (`compose`)
 
 ---
 
@@ -152,55 +47,246 @@ Knowledge can also:
 pip install general-intelligence
 ```
 
-*(Package published on PyPI.)*
-
 ---
 
-## Quick Start: Minimal Autonomous Knowledge
+## Quick Start
 
 ```python
 from gi import GeneralIntelligence, Knowledge
 gi = GeneralIntelligence()
-class ActiveKnowledge(Knowledge):
-    def is_active(self):
-        return True
-    def start(self, gi):
-        print("Thinking on my own...")
 
-gi.learn(ActiveKnowledge("self"))
+
+class EchoKnowledge(Knowledge):
+    def on(self, ctx, gi):
+        if hasattr(ctx, "message"):
+            return f"Echo: {ctx.message}"
+
+echo = EchoKnowledge()
+gi.learn(echo)
+
+class Context:
+    def __init__(self, message):
+        self.message = message
+
+print(list(gi.on(Context("Hello"))))  # ['Echo: Hello']
+
 ```
 
-Once learned, the knowledge begins acting independently.
+All knowledge instances share a **single model** and respond only to contexts relevant to them.
+
+---
+
+## ML-Style Additive Knowledge
+
+Demonstrates how `GeneralIntelligence` can handle **tabular, additive learning**:
+
+```python
+from gi import GeneralIntelligence, Knowledge
+from itertools import combinations
+
+gi = GeneralIntelligence()
+
+class AdditiveKnowledge(Knowledge):
+    def __init__(self, n_features):
+        self.n_features = n_features
+        self.valid_combinations = []
+
+    def on(self, ctx, gi):
+        if hasattr(ctx, "row") and hasattr(ctx, "target"):
+            row, target = ctx.row, ctx.target
+            # First time: cache all single-element combinations
+            if not self.valid_combinations:
+                all_combs = []
+                for r in range(1, self.n_features + 1):
+                    all_combs.extend(combinations(range(self.n_features), r))
+                self.valid_combinations = [
+                    comb for comb in all_combs if sum(row[i] for i in comb) == target
+                ]
+            # Keep only combinations that continue to hold
+            self.valid_combinations = [
+                comb for comb in self.valid_combinations
+                if sum(row[i] for i in comb) == target
+            ]
+        elif hasattr(ctx, "row"):
+            row = ctx.row
+            for comb in self.valid_combinations:
+                return sum(row[i] for i in comb)
+
+additive = AdditiveKnowledge(n_features=3)
+gi.learn(additive)
+
+# Training
+class TrainCtx:
+    def __init__(self, row, target):
+        self.row = row
+        self.target = target
+
+for row, target in [([1,2,3], 3), ([0,3,1], 3)]:
+    list(gi.on(TrainCtx(row, target)))
+
+# Prediction
+class PredictCtx:
+    def __init__(self, row):
+        self.row = row
+
+print(next(gi.on(PredictCtx([2,1,0]))))  # Output: sum of matching combination
+
+```
+
+---
+
+## Dialog / Prompt-Response Knowledge
+
+```python
+from gi import GeneralIntelligence, Knowledge
+gi = GeneralIntelligence()
+
+
+class DialogKnowledge(Knowledge):
+    def __init__(self):
+        self.history = []
+
+    def on(self, ctx, gi):
+        if hasattr(ctx, "user"):
+            self.history.append(ctx.user)
+            return f"Bot: I heard '{ctx.user}'"
+
+dialog = DialogKnowledge()
+gi.learn(dialog)
+
+class MsgCtx:
+    def __init__(self, user):
+        self.user = user
+
+for response in gi.on(MsgCtx("Hello")):
+    print(response)  # Bot: I heard 'Hello'
+
+```
+
+---
+
+## Autonomous Knowledge Example
+
+```python
+import threading, time
+from gi import GeneralIntelligence, Knowledge
+gi = GeneralIntelligence()
+
+import threading, time
+
+
+class TimerKnowledge(Knowledge):
+    def __init__(self):
+        self.count = 0
+
+    def on_add(self, knowledge, gi):
+        if self is knowledge:
+            self.running = True
+            self.thread = threading.Thread(target=self.run, args=(gi,), daemon=True)
+            self.thread.start()
+
+    def on_remove(self, knowledge, gi):
+        if self is knowledge:
+            self.running = False
+
+    def run(self, gi):
+        while getattr(self, "running", False):
+            print("Tick:", self.count)
+            self.count += 1
+            time.sleep(1)
+
+class TickCtx: pass
+timer = TimerKnowledge()
+gi.learn(timer)
+
+# Let autonomous timer run a few ticks
+time.sleep(5)
+gi.unlearn(timer)  # stop autonomous loop
+
+```
+
+---
+
+## Compositional Reasoning
+
+Knowledge can **modify shared context** and collaborate:
+
+```python
+from gi import GeneralIntelligence, Knowledge
+gi = GeneralIntelligence()
+
+
+class AccumulateKnowledge(Knowledge):
+    def compose(self, ctx, composer, gi):
+        if not hasattr(ctx, "accum"):
+            ctx.accum = []
+        ctx.accum.append("step")
+
+acc = AccumulateKnowledge()
+gi.learn(acc)
+
+def final_composer(ctx):
+    return getattr(ctx, "accum", [])
+
+class DummyCtx: pass
+
+print(gi.compose(DummyCtx(), final_composer))  # ['step']
+
+```
+
+Multiple knowledge types—ML-style, dialog, autonomous—can coexist in the same model.
+
+---
+
+## Architectural Principles
+
+| Concept               | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| Knowledge as agents   | Each instance is autonomous, reactive, and composable                 |
+| Structural similarity | ML-style learning can track relationships across inputs               |
+| Emergent reasoning    | Intelligence arises from knowledge interactions, not centralized code |
+| Composable context    | `compose` allows knowledge to collaborate in flexible ways            |
+| Distributed operation | Knowledge can operate independently, including autonomous loops       |
+
+---
+
+## Use Cases
+
+* **Hierarchical or multimodal reasoning systems**
+* **Interactive chatbots or agents**
+* **Tabular ML tasks and feature discovery**
+* **Autonomous monitoring or simulation agents**
+* **Hybrid AI systems combining specialized knowledge modules**
 
 ---
 
 ## Vision
 
-This project is part of a broader paradigm shift:
-**from intelligent algorithms to intelligent knowledge.**
+**GeneralIntelligence** shifts AI from **algorithm-driven to knowledge-driven**.
 
-It treats intelligence as a property of structured, interacting knowledge —
-a distributed, living network rather than a centralized model.
+Knowledge is:
 
-It’s tiny now, but the system already supports:
+* Composable
+* Inspectable
+* Autonomous
+* Extensible across tasks and domains
 
-* classification,
-* prompt-response cycles,
-* ongoing internal reasoning,
-* and even forms of literal consciousness — all from a simple, composable base.
+A single model can host **diverse knowledge types** that cooperate, compete, or ignore irrelevant contexts.
 
 ---
 
-## Next Directions
+## Next Steps
 
-* Specialized knowledge classes (symbolic, numeric, perceptual, temporal, etc.)
-* Multi-agent learning and cooperation
-* Integrations with reinforcement learning and deep learning models
-* Richer context composition and memory architectures
+* Specialized ML-style knowledge modules (numeric, logical, temporal)
+* Multi-agent reasoning
+* Integration with deep learning perception modules
+* Community-built knowledge libraries
+* Tutorials demonstrating **cross-cutting knowledge interactions**
 
 ---
 
 ## License
 
-MIT License.
-Copyright (c) 2025.
+MIT License
+Copyright (c) 2025
+

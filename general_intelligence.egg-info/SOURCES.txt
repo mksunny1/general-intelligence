@@ -9,3 +9,4 @@ general_intelligence.egg-info/dependency_links.txt
 general_intelligence.egg-info/top_level.txt
 gi/__init__.py
 gi/core.py
+tests/test_core.py

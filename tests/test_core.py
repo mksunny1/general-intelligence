@@ -1,31 +1,24 @@
+import pytest
 import time
 import threading
 from gi import GeneralIntelligence, Knowledge
 from itertools import combinations
 
-gi = GeneralIntelligence()
-
 # -----------------------------
 # ML-Style Additive Knowledge
 # -----------------------------
 class AdditiveKnowledge(Knowledge):
-    """
-    Learns additive relationships between input features and targets.
-    """
-
     def __init__(self, n_features):
         self.n_features = n_features
         self.valid_combinations = []
 
     def on(self, ctx, gi):
-        if not hasattr(ctx, "row"):
+        if "row" not in ctx:
             return None
-        row = ctx.row
-        target = getattr(ctx, "target", None)
-        is_train = hasattr(ctx, "target") and target is not None
 
-        if is_train:
-            # If first row, generate all possible combinations
+        row, target, train = ctx.get("row"), ctx.get("target"), ctx.get("train", False)
+
+        if train:
             if not self.valid_combinations:
                 all_combs = []
                 for r in range(1, self.n_features + 1):
@@ -34,7 +27,6 @@ class AdditiveKnowledge(Knowledge):
                     comb for comb in all_combs if sum(row[i] for i in comb) == target
                 ]
             else:
-                # Filter combinations to keep only those consistent with this row
                 self.valid_combinations = [
                     comb for comb in self.valid_combinations if sum(row[i] for i in comb) == target
                 ]
@@ -42,59 +34,31 @@ class AdditiveKnowledge(Knowledge):
         else:
             if not self.valid_combinations:
                 return None
-            # Pick the first combination for demonstration
             comb = self.valid_combinations[0]
             return sum(row[i] for i in comb)
 
 
-additive = AdditiveKnowledge(n_features=3)
-gi.learn(additive)
-
-# Training
-class TrainCtx:
-    def __init__(self, row, target):
-        self.row = row
-        self.target = target
-
-for row, target in [([1,2,3], 3), ([0,3,1], 3)]:
-    list(gi.on(TrainCtx(row, target)))
-
-# Prediction
-class PredictCtx:
-    def __init__(self, row):
-        self.row = row
-
-prediction_row = [2,1,0]
-print("ML Prediction:", next(gi.on(PredictCtx(prediction_row))))
-
-
 # -----------------------------
-# Dialog / Prompt-Response Knowledge
+# Dialog Knowledge
 # -----------------------------
 class DialogKnowledge(Knowledge):
     def __init__(self):
         self.history = []
 
     def on(self, ctx, gi):
-        if hasattr(ctx, "user"):
-            self.history.append(ctx.user)
-            return f"Bot: I heard '{ctx.user}'"
-
-dialog = DialogKnowledge()
-gi.learn(dialog)
-
-class UserCtx:
-    def __init__(self, user):
-        self.user = user
-
-for response in gi.on(UserCtx("Hello")):
-    print(response)
-for response in gi.on(UserCtx("How are you?")):
-    print(response)
+        msg = ctx.get("user")
+        if msg:
+            self.history.append(msg)
+            return f"Bot: I heard '{msg}'"
 
 
 # -----------------------------
-# Autonomous Knowledge Example
+# Autonomous Knowledge
+#
+
+
+# -----------------------------
+# Autonomous Knowledge
 # -----------------------------
 class TimerKnowledge(Knowledge):
     def __init__(self):
@@ -117,29 +81,68 @@ class TimerKnowledge(Knowledge):
             time.sleep(1)
 
 class TickCtx: pass
-timer = TimerKnowledge()
-gi.learn(timer)
-
-# Let autonomous timer run a few ticks
-time.sleep(5)
-gi.unlearn(timer)  # stop autonomous loop
 
 
 # -----------------------------
-# Compositional Reasoning
+# Compositional Reasoning Knowledge
 # -----------------------------
 class AccumulateKnowledge(Knowledge):
     def compose(self, ctx, composer, gi):
-        if not hasattr(ctx, "accum"):
-            ctx.accum = []
-        ctx.accum.append("step")
+        ctx.setdefault("accum", []).append("step")
 
-acc = AccumulateKnowledge()
-gi.learn(acc)
 
-class DummyCtx: pass
+# -----------------------------
+# Tests
+# -----------------------------
+def test_additive_knowledge_training_and_prediction():
+    gi = GeneralIntelligence()
+    additive = AdditiveKnowledge(n_features=3)
+    gi.learn(additive)
 
-def final_composer(ctx):
-    return getattr(ctx, "accum", [])
+    training_data = [([1, 2, 3], 3), ([0, 3, 1], 3)]
+    for row, target in training_data:
+        list(gi.on({"row": row, "target": target, "train": True}))
 
-print("Compositional Output:", gi.compose(DummyCtx(), final_composer))  # ['step']
+    prediction = next(gi.on({"row": [2, 1, 0], "train": False}))
+    assert prediction == sum([2, 1, 0][:2])  # Any valid combination sum
+
+
+def test_dialog_knowledge_response():
+    gi = GeneralIntelligence()
+    dialog = DialogKnowledge()
+    gi.learn(dialog)
+
+    responses = list(gi.on({"user": "Hello"}))
+    assert responses == ["Bot: I heard 'Hello'"]
+
+    responses = list(gi.on({"user": "How are you?"}))
+    assert responses == ["Bot: I heard 'How are you?'"]
+    assert dialog.history == ["Hello", "How are you?"]
+
+
+def test_autonomous_knowledge_runs_and_stops():
+    gi = GeneralIntelligence()
+    timer = TimerKnowledge()
+    assert getattr(timer, "count", -1) == 0
+    gi.learn(timer)
+
+    # Give it some time to start
+    time.sleep(5)
+    gi.unlearn(timer)
+    assert getattr(timer, "count", -1) == 5
+
+
+def test_compositional_reasoning():
+    gi = GeneralIntelligence()
+    acc = AccumulateKnowledge()
+    gi.learn(acc)
+
+    def final_composer(ctx):
+        return ctx.get("accum")
+
+    result = gi.compose({}, final_composer)
+    assert result == ["step"]
+
+
+if __name__ == "__main__":
+    pytest.main()
