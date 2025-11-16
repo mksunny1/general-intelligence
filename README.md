@@ -258,12 +258,45 @@ A single model can host **diverse knowledge types** that cooperate, compete, or 
 
 ---
 
+## Combinatorial Knowledge (Experimental)
+
+Located in the gi.knowledge subpackage, the CombinatorialKnowledge class is 
+the first experimental ML-style knowledge subclass in the framework. 
+It implements a hypothesis-driven approach to learning relationships 
+between rows and targets:
+
+### Key Features
+
+- Accepts arbitrary functions for combining row subsets.
+- Can test relationships against targets, features, or constants.
+- Supports nested hypotheses for feature-based rules.
+- Tracks failures and removes hypotheses exceeding tolerance.
+- Prediction returns all applicable outputs, letting the caller decide how to aggregate.
+
+⚠️ Important: This knowledge class has not been extensively tested.
+It is an ideal first contribution opportunity for developers to help identify any issues, 
+improve robustness, and extend functionality.
+
+The class is designed as a starting point for more sophisticated ML-style knowledge modules. 
+Future contributions could include:
+
+- Additional combinator functions for math, logic, hybrid, and relational rules
+- Multi-tasking capabilities
+- Enhanced noise tolerance strategies
+- Integration examples for real-world datasets
+- Spotting and covering edge cases
+- Writing tests
+
+By contributing tests, fixes, and extensions, you can help build the foundation of a rich, 
+modular knowledge ecosystem.
+
+---
+
 ## Next Steps
 
-* Specialized ML-style knowledge modules (numeric, logical, temporal)
-* Multi-agent reasoning
-* Integration with deep learning perception modules
+* Specialized knowledge modules
 * Community-built knowledge libraries
+* Port to other languages
 * Tutorials demonstrating **cross-cutting knowledge interactions**
 
 ---
