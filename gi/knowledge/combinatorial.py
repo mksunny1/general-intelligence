@@ -92,6 +92,9 @@ class CombinatorialKnowledge(Knowledge):
         row = ctx.row
         target_index = ctx.target_index
 
+        if target_index is None:
+            return self.predict(row)
+
         new_hypotheses = {}
 
         for (
