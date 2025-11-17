@@ -10,5 +10,6 @@ general_intelligence.egg-info/top_level.txt
 gi/__init__.py
 gi/core.py
 gi/knowledge/__init__.py
-gi/knowledge/combinatorial.py
+gi/knowledge/functions.py
 tests/test_core.py
+tests/test_function_knowledge.py
