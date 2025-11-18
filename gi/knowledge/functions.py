@@ -1,11 +1,19 @@
 from itertools import combinations
-from gi import Knowledge
+from gi import Knowledge, GeneralIntelligence
 
 
 class Context:
     def __init__(self, row, target_index=-1):
         self.row = row
         self.target_index = target_index
+
+
+def on(gi: GeneralIntelligence, context: Context):
+    result = []
+    for result1 in gi.on(context):
+        for result2 in result1:
+            result.append(result2)
+    return result
 
 
 class FunctionKnowledge(Knowledge):
@@ -83,17 +91,21 @@ class FunctionKnowledge(Knowledge):
     # Training
     # ----------------------------------------------------------------------
     def on(self, ctx, gi):
+        # print(repr(ctx))
         if not isinstance(ctx, Context):
             return None
-
+        # print(self.hypotheses)
         row = ctx.row
         target_index = ctx.target_index
 
+        # print(row, target_index)
+
         # row[target_index] = None = prediction mode
         if row[target_index] is None:
-            return self.predict(row)
+            return self.predict(row, gi)
 
         new_h = {}
+        # print(row, target_index)
 
         for key, fn, lhs_subset, lhs_values, rhs_type, rhs_val in self._enumerate(
             row, target_index
@@ -112,7 +124,9 @@ class FunctionKnowledge(Knowledge):
             except Exception:
                 ok = False
 
+            # print(lhs_values, rhs, ok)
             if ok:
+                # print('ok!')
                 h = self.hypotheses.get(key, {"fail": 0, "child": None})
                 new_h[key] = h
 
@@ -126,13 +140,13 @@ class FunctionKnowledge(Knowledge):
         self.hypotheses = new_h
 
         # child learners for non-target
-        self._children_update(row, target_index)
+        self._children_update(row, target_index, gi)
         return None
 
     # ----------------------------------------------------------------------
     # Child update
     # ----------------------------------------------------------------------
-    def _children_update(self, row, target_index):
+    def _children_update(self, row, target_index, gi):
         if self.max_depth <= 0:
             return
 
@@ -155,12 +169,12 @@ class FunctionKnowledge(Knowledge):
                     parent_keys=(*self.parent_keys, key),
                 )
 
-            h["child"].on(Context(row, target_index))
+            h["child"].on(Context(row, target_index), gi)
 
     # ----------------------------------------------------------------------
     # Prediction
     # ----------------------------------------------------------------------
-    def predict(self, row):
+    def predict(self, row, gi):
         for key, h in self.hypotheses.items():
             fn_index, lhs_subset, (rhs_type, rhs_val) = key
             fn = self.functions[fn_index]
@@ -184,6 +198,6 @@ class FunctionKnowledge(Knowledge):
                     ok = False
 
                 if ok and h["child"] is not None:
-                    for output in h["child"].predict(row):
+                    for output in h["child"].predict(row, gi):
                         yield output
 

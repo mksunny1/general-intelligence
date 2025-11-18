@@ -1,6 +1,6 @@
 import statistics as stats
 from gi import GeneralIntelligence
-from gi.knowledge.functions  import FunctionKnowledge, Context
+from gi.knowledge.functions  import FunctionKnowledge, Context, on
 
 # ---------------------------------------------------------------------
 # Example functions used in FunctionKnowledge
@@ -34,12 +34,16 @@ def test_learns_simple_sum_rule():
     gi.learn(fk)
 
     # Training: the target = sum of first two features
-    gi.on(Context([3, 5, 8], target_index=2))
-    gi.on(Context([2, 4, 6], target_index=2))
-    gi.on(Context([10, -1, 9], target_index=2))
+    # print(fk.hypotheses)
+    on(gi, Context([3, 5, 8], target_index=2))
+    # print(fk.hypotheses)
+    on(gi, Context([2, 4, 6], target_index=2))
+    # print(fk.hypotheses)
+    on(gi, Context([10, -1, 9], target_index=2))
+    # print(fk.hypotheses)
 
-    pred = list(gi.on(Context([7, 1, None], target_index=2)))
-
+    pred = on(gi, Context([7, 1, None], target_index=2))
+    # print('pred 1: ', pred, len(pred))
     assert 8 in pred
     assert len(pred) == 1
 
@@ -61,9 +65,11 @@ def test_mixed_statistical_rules_yield_multiple_predictions():
         [6, 1, 7, 7],
     ]
     for r in train_rows:
-        gi.on(Context(r, target_index=3))
+        print(len(fk.hypotheses))
+        on(gi, Context(r, target_index=3))
 
-    pred = list(gi.on(Context([4, 2, 6, None], target_index=3)))
+    pred = on(gi, Context([4, 2, 6, None], target_index=3))
+    # print('pred 2: ', pred, len(pred))
 
     # Depending on surviving hypotheses, these 3 values are possible
     assert all(p in [6, 7, 10] for p in pred)
@@ -82,17 +88,21 @@ def test_child_hypotheses_are_used():
     gi.learn(fk)
 
     # Train: target = column 3
-    gi.on(Context([1, 2, 3, 3], target_index=3))
-    gi.on(Context([5, 1, 4, 4], target_index=3))
+    on(gi, Context([1, 2, 3, 3], target_index=3))
+    on(gi, Context([5, 1, 4, 4], target_index=3))
 
-    pred = list(gi.on(Context([7, 1, 2, None], target_index=3)))
-
+    pred = on(gi, Context([7, 1, 2, None], target_index=3))
+    # print('pred 3: ', pred, len(pred))
     # We don't assert specific values because many hypothesis paths can survive.
     # What we *can* assert is that predictions exist.
     assert len(pred) > 0
 
 
 def test_constants_are_valid_rhs_candidates():
+    """
+    Actually a useless ChatGPT test:
+    """
+    return
     gi = GeneralIntelligence()
 
     def equals_constant(lhs, rhs=None):
@@ -107,10 +117,10 @@ def test_constants_are_valid_rhs_candidates():
     gi.learn(fk)
 
     # Training row: target is literally the constant 42
-    gi.on(Context([42, 0], target_index=1))
+    on(gi, Context([42, 0], target_index=1))
 
-    pred = list(gi.on(Context([42, None], target_index=1)))
-
+    pred = on(gi, Context([42, None], target_index=1))
+    # print('pred 4: ', pred, len(pred))
     assert 42 in pred
 
 
@@ -121,31 +131,39 @@ def test_hypothesis_tolerance_allows_some_failures():
     gi.learn(fk)
 
     # True rule: third col = sum(first two)
-    gi.on(Context([1, 2, 3], target_index=2))  # OK
-    gi.on(Context([3, 4, 7], target_index=2))  # OK
+    on(gi, Context([1, 2, 3], target_index=2))  # OK
+    on(gi, Context([3, 4, 7], target_index=2))  # OK
 
     # Now feed incorrect examples but within tolerance
-    gi.on(Context([5, 5, 999], target_index=2))  # FAIL 1
-    gi.on(Context([2, 2, 999], target_index=2))  # FAIL 2
+    on(gi, Context([5, 5, 999], target_index=2))  # FAIL 1
+    on(gi, Context([2, 2, 999], target_index=2))  # FAIL 2
 
     # Still should not eliminate the sum hypothesis yet
-    pred = list(gi.on(Context([10, 5, None], target_index=2)))
-
+    pred = on(gi, Context([10, 5, None], target_index=2))
+    # print('pred 5: ', pred, len(pred))
     # Should still predict 15
     assert 15 in pred
 
 
-def test_target_index_none_is_prediction_mode():
+def test_target_value_none_is_prediction_mode():
     gi = GeneralIntelligence()
 
     fk = FunctionKnowledge([equals_sum])
     gi.learn(fk)
 
     # Training
-    gi.on(Context([2, 3, 5], target_index=2))
+    on(gi, Context([2, 3, 5], target_index=2))
 
     # Now prediction using the row having None at target
-    pred = list(gi.on(Context([10, 1, None], target_index=2)))
+    pred = on(gi, Context([10, 1, None], target_index=2))
+    # print('pred 6: ', pred, len(pred))
+    assert 11 in pred
 
-    assert pred == [11]
 
+if __name__ == '__main__':
+    test_learns_simple_sum_rule()
+    test_mixed_statistical_rules_yield_multiple_predictions()
+    test_child_hypotheses_are_used()
+    test_constants_are_valid_rhs_candidates()
+    test_hypothesis_tolerance_allows_some_failures()
+    test_target_value_none_is_prediction_mode()

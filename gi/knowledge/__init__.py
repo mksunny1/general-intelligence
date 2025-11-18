@@ -1,1 +1,1 @@
-from functions import FunctionKnowledge
+from gi.knowledge.functions import FunctionKnowledge

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Any
 
 
 class GeneralIntelligence:
@@ -125,6 +125,10 @@ class GeneralIntelligence:
                     else result
                 )
                 yield response
+
+
+def on(gi: GeneralIntelligence, context: Any):
+    return list(gi.on(context))
 
 
 class Knowledge:

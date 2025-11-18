@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: general_intelligence
-Version: 0.6.0
+Version: 0.6.1
 Summary: Self-organizing knowledge systems for structural pattern learning
 Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
 License-Expression: MIT
@@ -404,6 +404,7 @@ We don't call a `.train()` or `.predict()` on this. We use the same `gi.on()` in
 # **Constructor**
 
 ```python
+from gi.knowledge.functions  import FunctionKnowledge, Context
 FunctionKnowledge(
     functions,          # list of hypothesis functions
     *,
@@ -456,6 +457,8 @@ Each function accepts **any number of LHS values** and **RHS of any type**.
 
 ```python
 from gi import GeneralIntelligence
+from gi.knowledge.functions  import FunctionKnowledge, Context
+
 gi = GeneralIntelligence()
 
 fk = FunctionKnowledge(
@@ -484,6 +487,8 @@ list(gi.on(Context([7, 1, None], target_index=2)))
 # **Example: Mixed Statistical Rules**
 
 ```python
+from gi import GeneralIntelligence
+from gi.knowledge.functions  import FunctionKnowledge, Context
 fk = FunctionKnowledge(
     [equals_sum, greater_than, less_than, equals_median],
     constants=[0, 10],
@@ -528,6 +533,8 @@ lhs → feature[k]
 then FK creates a **child FunctionKnowledge** to nest similarly to tree models.
 
 ```python
+from gi import GeneralIntelligence
+from gi.knowledge.functions  import FunctionKnowledge, Context
 fk = FunctionKnowledge(
     [equals_sum, equals_median],
     max_depth=3,
