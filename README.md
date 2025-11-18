@@ -113,10 +113,12 @@ This makes it *trivially portable* to other languages:
 * R
 * Rust
 * Go
-* C++
+* C/C++
 * TypeScript
 * Java/Kotlin
 * Swift
+* C#
+* Zig/Others
 
 The entire ecosystem can be replicated across languages and share conceptual knowledge.
 
