@@ -191,8 +191,8 @@ class FunctionKnowledge(Knowledge):
             return self.predict(row, lhs_cache, gi)
 
         new_h = {}
-        combs = list(self._enumerate(row, target_index, lhs_cache))
-        print(len(combs), self.max_depth, self.count)
+        combs = self._enumerate(row, target_index, lhs_cache)
+        # print(len(combs), self.max_depth, self.count)
         self.count += 1
 
         for key, compare_fn, computed_lhs in combs:
