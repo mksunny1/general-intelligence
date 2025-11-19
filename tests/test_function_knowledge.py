@@ -52,7 +52,8 @@ def test_mixed_statistical_rules_yield_multiple_predictions():
 
     fk = FunctionKnowledge(
         [equals_sum, greater_than, less_than, equals_median],
-        constants=[0, 10]
+        constants=[0, 10],
+        max_depth=2
     )
     gi.learn(fk)
 
@@ -62,10 +63,11 @@ def test_mixed_statistical_rules_yield_multiple_predictions():
         [6, 1, 7, 7],
     ]
     for r in train_rows:
-        print(len(fk.hypotheses))
+        # print(len(fk.hypotheses))
         on(gi, Context(r, target_index=3))
 
     pred = on(gi, Context([4, 2, 6, None], target_index=3))
+    # print('pred: ', len(pred), pred)
     assert all(p in [6, 7, 10] for p in pred)
     assert len(pred) >= 1
     print("✓ test_mixed_statistical_rules_yield_multiple_predictions passed")
@@ -134,7 +136,7 @@ def test_multiple_values_mode():
 
 if __name__ == '__main__':
     test_learns_simple_sum_rule()
-    # test_mixed_statistical_rules_yield_multiple_predictions()
+    test_mixed_statistical_rules_yield_multiple_predictions()
     test_child_hypotheses_are_used()
     test_hypothesis_tolerance_allows_some_failures()
     test_target_value_none_is_prediction_mode()

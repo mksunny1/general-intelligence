@@ -114,7 +114,7 @@ class FunctionKnowledge(Knowledge):
             functions,
             *,
             constants=None,
-            tolerance=2,
+            tolerance=0,
             max_depth=4,
             parent_keys=(),
             lhs_cache=None,
@@ -126,6 +126,7 @@ class FunctionKnowledge(Knowledge):
         self.parent_keys = parent_keys
 
         # hyp_key → {"fail": int, "child": FunctionKnowledge or None}
+        self.lhs_cache = None
         self.hypotheses = {}
         self.count = 0
 
@@ -148,13 +149,8 @@ class FunctionKnowledge(Knowledge):
         cache = []
 
         for row_compute_fn, compare_fn in self.functions:
-            try:
-                values_list = row_compute_fn(row)
-            except Exception:
-                values_list = []
-
+            values_list = row_compute_fn(row)
             cache.append((values_list, compare_fn))
-
         return cache
 
     # ----------------------------------------------------------------------
@@ -163,9 +159,6 @@ class FunctionKnowledge(Knowledge):
     def _enumerate(self, row, target_index, lhs_cache):
         for fn_index, (values_list, compare_fn) in enumerate(lhs_cache):
             for value_index, computed_value in enumerate(values_list):
-                if computed_value is None:
-                    continue
-
                 for rhs_type, rhs_val in self._rhs_candidates(row, target_index):
                     key = (fn_index, value_index, (rhs_type, rhs_val))
                     yield key, compare_fn, computed_value
@@ -192,8 +185,6 @@ class FunctionKnowledge(Knowledge):
 
         new_h = {}
         combs = self._enumerate(row, target_index, lhs_cache)
-        # print(len(combs), self.max_depth, self.count)
-        self.count += 1
 
         for key, compare_fn, computed_lhs in combs:
             rhs_type, rhs_val = key[2]
@@ -213,8 +204,14 @@ class FunctionKnowledge(Knowledge):
                 ok = False
 
             if ok:
-                h = self.hypotheses.get(key, {"fail": 0, "child": None})
-                new_h[key] = h
+                if not len(self.hypotheses):
+                    new_h[key] = {"fail": 0, "child": None}
+                elif key in self.hypotheses:
+                    new_h[key] = self.hypotheses[key]
+                elif self.count <= self.tolerance:
+                    new_h[key] = {"fail": self.count, "child": None}
+
+        self.count += 1
 
         # Old hypotheses failing
         for key, h in self.hypotheses.items():
@@ -276,8 +273,11 @@ class FunctionKnowledge(Knowledge):
 
                     if rhs_type == "target":
                         # prediction: use computed_value as the prediction
-                        yield computed_value
-
+                        if self.functions[fn_index][1](computed_value, computed_value):
+                            # literally only == comparisons; we cant predict bounds
+                            # because there could be collisions. So bounds will only
+                            # be useful for nesting logic, not final predictions.
+                            yield computed_value
                     else:
                         # feature / constant hypothesis:
                         rhs = row[rhs_val] if rhs_type == "feature" else rhs_val

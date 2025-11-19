@@ -1,6 +1,6 @@
 [project]
 name = "general_intelligence"
-version = "0.7.2"
+version = "0.8.0"
 authors = [
   { name="Oluwaseyi Shoboyejo", email="sunmark130@gmail.com" },
 ]
