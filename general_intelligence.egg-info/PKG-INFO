@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: general_intelligence
-Version: 0.6.2
+Version: 0.7.1
 Summary: Self-organizing knowledge systems for structural pattern learning
 Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
 License-Expression: MIT
@@ -357,11 +357,6 @@ Multiple knowledge types—ML-style, dialog, autonomous—can coexist in the sam
 
 ---
 
-Understood.
-Here is **only the FunctionKnowledge section** — clean, concise, and fully aligned with your architecture (GI + Context + gi.on).
-
----
-
 ## **FunctionKnowledge** (Experimental)
 
 `FunctionKnowledge` is a hypothesis-driven learner that discovers relations between subsets of input features and some RHS value. 
@@ -371,33 +366,32 @@ standard `gi.on(Context(...))` interface.
 A **hypothesis** has the form:
 
 ```
-(fn_index, lhs_subset, (rhs_type, rhs_value))
+(fn_index, value_index, (rhs_type, rhs_value))
 ```
 
 Where:
 
 * **fn_index** → index into the provided list of functions
-* **lhs_subset** → indices of features used as LHS
+* **value_index** → index into the list of values returned by that function
 * **rhs_type** → `"target" | "feature" | "constant"`
 * **rhs_value**
-
   * None for `"target"`
   * a feature index for `"feature"`
   * literal value for `"constant"`
 
-Each function must support:
+Each function tuple consists of `(row_compute_fn, compare_fn)`:
 
-```
-# training mode
-fn(lhs_values, rhs) → bool
+```python
+# row_compute_fn: computes all subset values at once
+row_compute_fn(row) → [value1, value2, ...]
 
-# prediction mode
-fn(lhs_values) → predicted_rhs | None
+# compare_fn: used during training
+compare_fn(computed_value, rhs) → bool
 ```
 
 During training (when `row[target_index]` is not None), FunctionKnowledge checks which hypotheses remain consistent and which fail. Failing hypotheses are allowed to survive up to a configurable tolerance. When the RHS refers to another feature or a constant, a child FunctionKnowledge is spawned to infer deeper dependencies up to `max_depth`.
 
-During prediction (when `row[target_index] is None`), any surviving hypothesis whose function supports inference will yield predicted outputs through GI.
+During prediction (when `row[target_index] is None`), any surviving hypothesis will yield predicted outputs through GI.
 
 We don't call a `.train()` or `.predict()` on this. We use the same `gi.on()` interface invoking it with an instance of Context exported from the `FunctionKnowledge` module.
 
@@ -406,18 +400,43 @@ We don't call a `.train()` or `.predict()` on this. We use the same `gi.on()` in
 # **Constructor**
 
 ```python
-from gi.knowledge.functions  import FunctionKnowledge, Context
+from gi.knowledge.functions import FunctionKnowledge, Context
+
 FunctionKnowledge(
-    functions,          # list of hypothesis functions
+    functions,  # list of (row_compute_fn, compare_fn) tuples
     *,
-    constants=None,     # constant RHS candidates
-    min_lhs=1,
-    max_lhs=2,
-    tolerance=2,        # how many failures a hypothesis can survive
-    max_depth=4,        # nested hypotheses levels
-    parent_keys=(),     # prevents cycles in the hierarchy
+    constants=None,  # constant RHS candidates
+    tolerance=2,  # how many failures a hypothesis can survive
+    max_depth=4,  # nested hypotheses levels
+    parent_keys=(),  # prevents cycles in the hierarchy
 )
 ```
+
+---
+
+# **Utility Functions**
+
+FunctionKnowledge provides utility functions to easily create row-level compute functions:
+
+```python
+from gi.knowledge.functions import make_combinations, make_permutations
+
+# Create a function that computes over all combinations of subsets
+row_compute_fn = make_combinations(
+    lambda subset: sum(subset),  # subset-level compute function
+    min_size=2,
+    max_size=2
+)
+
+# Create a function that computes over all permutations (order matters)
+row_compute_fn = make_permutations(
+    lambda subset: subset[0] - subset[1],  # subset-level compute function
+    min_size=2,
+    max_size=2
+)
+```
+
+These wrappers handle iterating through all subsets and collecting results, so you only need to define the computation for a single subset.
 
 ---
 
@@ -425,33 +444,52 @@ FunctionKnowledge(
 
 ```python
 import statistics as stats
+from gi.knowledge.functions import make_combinations
 
-def equals_sum(lhs, rhs=None):
-    total = sum(lhs)
-    if rhs is None:
-        return total
-    return total == rhs
+def compare_equals(computed, rhs):
+    return computed == rhs
 
-def greater_than(lhs, rhs=None):
-    m = max(lhs)
-    if rhs is None:
-        return m
-    return m > rhs
+def compare_greater(computed, rhs):
+    return computed > rhs
 
-def less_than(lhs, rhs=None):
-    mn = min(lhs)
-    if rhs is None:
-        return mn
-    return mn < rhs
+def compare_less(computed, rhs):
+    return computed < rhs
 
-def equals_median(lhs, rhs=None):
-    med = stats.median(lhs)
-    if rhs is None:
-        return med
-    return med == rhs
+# Create row-level functions using the utility wrappers
+equals_sum = (
+    make_combinations(lambda s: sum(s), min_size=2, max_size=2),
+    compare_equals
+)
+
+greater_than = (
+    make_combinations(lambda s: max(s), min_size=1, max_size=3),
+    compare_greater
+)
+
+less_than = (
+    make_combinations(lambda s: min(s), min_size=1, max_size=3),
+    compare_less
+)
+
+equals_median = (
+    make_combinations(lambda s: stats.median(s), min_size=1, max_size=3),
+    compare_equals
+)
 ```
 
-Each function accepts **any number of LHS values** and **RHS of any type**.
+You can also create custom row-level functions directly:
+
+```python
+# Custom function that returns multiple values per row
+def custom_compute(row):
+    results = []
+    # Your custom logic here
+    results.append(row[0] + row[1])
+    results.append(row[0] * row[2])
+    return results
+
+custom_fn = (custom_compute, compare_equals)
+```
 
 ---
 
@@ -459,16 +497,18 @@ Each function accepts **any number of LHS values** and **RHS of any type**.
 
 ```python
 from gi import GeneralIntelligence
-from gi.knowledge.functions  import FunctionKnowledge, Context
+from gi.knowledge.functions import FunctionKnowledge, Context, make_combinations
 
-gi = GeneralIntelligence()
+def compare_equals(computed, rhs):
+    return computed == rhs
 
-fk = FunctionKnowledge(
-    [equals_sum],
-    min_lhs=2,
-    max_lhs=2,
+equals_sum = (
+    make_combinations(lambda s: sum(s), min_size=2, max_size=2),
+    compare_equals
 )
 
+gi = GeneralIntelligence()
+fk = FunctionKnowledge([equals_sum])
 gi.learn(fk)
 
 # Train: third entry is target
@@ -490,12 +530,26 @@ list(gi.on(Context([7, 1, None], target_index=2)))
 
 ```python
 from gi import GeneralIntelligence
-from gi.knowledge.functions  import FunctionKnowledge, Context
+from gi.knowledge.functions import FunctionKnowledge, Context, make_combinations
+import statistics as stats
+
+def compare_equals(computed, rhs):
+    return computed == rhs
+
+def compare_greater(computed, rhs):
+    return computed > rhs
+
+def compare_less(computed, rhs):
+    return computed < rhs
+
+equals_sum = (make_combinations(lambda s: sum(s), min_size=2, max_size=2), compare_equals)
+greater_than = (make_combinations(lambda s: max(s), min_size=1, max_size=3), compare_greater)
+less_than = (make_combinations(lambda s: min(s), min_size=1, max_size=3), compare_less)
+equals_median = (make_combinations(lambda s: stats.median(s), min_size=1, max_size=3), compare_equals)
+
 fk = FunctionKnowledge(
     [equals_sum, greater_than, less_than, equals_median],
     constants=[0, 10],
-    min_lhs=1,
-    max_lhs=3,
 )
 
 gi = GeneralIntelligence()
@@ -503,9 +557,9 @@ gi.learn(fk)
 
 # Suppose the target is feature 3
 train_rows = [
-    [2, 3, 5, 5],     # median([2,3,5]) = 3 ≠ 5 → rejected for that hypothesis
-    [1, 9, 10, 10],   # max([1,9,10]) = 10 → OK
-    [6, 1, 7, 7],     # sum([6,1]) = 7 → OK
+    [2, 3, 5, 5],
+    [1, 9, 10, 10],
+    [6, 1, 7, 7],
 ]
 
 for r in train_rows:
@@ -524,6 +578,39 @@ Multiple hypotheses may fire — GI simply yields them all.
 
 ---
 
+# **Example: Permutations (Order Matters)**
+
+```python
+from gi import GeneralIntelligence
+from gi.knowledge.functions import FunctionKnowledge, Context, make_permutations
+
+def compare_equals(computed, rhs):
+    return computed == rhs
+
+# Difference function where order matters
+equals_difference = (
+    make_permutations(lambda s: s[0] - s[1], min_size=2, max_size=2),
+    compare_equals
+)
+
+gi = GeneralIntelligence()
+fk = FunctionKnowledge([equals_difference])
+gi.learn(fk)
+
+# Train: target = difference (order matters!)
+gi.on(Context([5, 2, 3], target_index=2))  # 5 - 2 = 3
+gi.on(Context([8, 3, 5], target_index=2))  # 8 - 3 = 5
+```
+
+### Predict
+
+```python
+list(gi.on(Context([10, 3, None], target_index=2)))
+# → [7]  (10 - 3 = 7)
+```
+
+---
+
 # **Example: Feature-to-Feature Reasoning (Child Learners)**
 
 If a hypothesis says:
@@ -536,7 +623,15 @@ then FK creates a **child FunctionKnowledge** to nest similarly to tree models.
 
 ```python
 from gi import GeneralIntelligence
-from gi.knowledge.functions  import FunctionKnowledge, Context
+from gi.knowledge.functions import FunctionKnowledge, Context, make_combinations
+import statistics as stats
+
+def compare_equals(computed, rhs):
+    return computed == rhs
+
+equals_sum = (make_combinations(lambda s: sum(s), min_size=1, max_size=3), compare_equals)
+equals_median = (make_combinations(lambda s: stats.median(s), min_size=1, max_size=3), compare_equals)
+
 fk = FunctionKnowledge(
     [equals_sum, equals_median],
     max_depth=3,
@@ -546,8 +641,8 @@ gi = GeneralIntelligence()
 gi.learn(fk)
 
 # Train where target = column 3
-gi.on(Context([1, 2, 3, 3], target_index=3))   # median([1,2,3]) = 2 → feature[1]? → child learns it
-gi.on(Context([5, 1, 4, 4], target_index=3))   # sum([1,4]) = 5? → etc.
+gi.on(Context([1, 2, 3, 3], target_index=3))
+gi.on(Context([5, 1, 4, 4], target_index=3))
 ```
 
 ### Predict
