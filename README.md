@@ -340,7 +340,7 @@ Multiple knowledge types—ML-style, dialog, autonomous—can coexist in the sam
 
 ---
 
-## **FunctionKnowledge** (Experimental)
+## **FunctionKnowledge**
 
 `FunctionKnowledge` is a hypothesis-driven learner that discovers relations between subsets of input features and some RHS value. 
 It is plugged into a `GeneralIntelligence` instance, and it participates in learning and prediction through the 

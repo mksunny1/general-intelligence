@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: general_intelligence
-Version: 0.8.0
+Version: 0.8.1
 Summary: Self-organizing knowledge systems for structural pattern learning
 Author-email: Oluwaseyi Shoboyejo <sunmark130@gmail.com>
 License-Expression: MIT
@@ -357,7 +357,7 @@ Multiple knowledge types—ML-style, dialog, autonomous—can coexist in the sam
 
 ---
 
-## **FunctionKnowledge** (Experimental)
+## **FunctionKnowledge**
 
 `FunctionKnowledge` is a hypothesis-driven learner that discovers relations between subsets of input features and some RHS value. 
 It is plugged into a `GeneralIntelligence` instance, and it participates in learning and prediction through the 
